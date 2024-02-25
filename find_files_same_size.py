@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 from send2trash import send2trash
 
+prompt_delete = None
+
 
 def create_file_dataframe(root_dir: str) -> pd.DataFrame:
     """Create a DataFrame with the file information in the root directory and its subdirectories
@@ -90,19 +92,42 @@ def prompt_to_delete_by_number(group: pd.DataFrame) -> None:
         print(f"Error deleting {file_name}: {e}")
 
 
-if __name__ == "__main__":
+def is_valid_directory(parser, arg):
+    if not os.path.exists(arg):
+        parser.error("The directory %s does not exist!" % arg)
+    else:
+        return arg
 
+
+# Check the parser (not argv) for the source directory as the next non-flag option in the command line arguments
+if __name__ == "__main__":
     # Check if the user wants to delete files
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--prompt", action="store_true", dest="prompt", default=False)
+    # Command line should look like this for entering the root directory and the --prompt flag:
+    # python find_files_same_size.py --prompt "C:\Users\username\Documents"
+    parser = argparse.ArgumentParser(description="Find files of the same size.")
+    parser.add_argument("--prompt", action="store_true", help="Prompt before deleting files.")
+    parser.add_argument(
+        "directory",
+        nargs="?",
+        default=os.getcwd(),
+        type=lambda x: is_valid_directory(parser, x),
+        help="Directory to search.",
+    )
+
     args = parser.parse_args()
+
+    root_directory = args.directory
     prompt_delete = args.prompt
 
-    # Get the root directory from the command line
-    root_directory = r"path/to/files"
-
     # Create a DataFrame with the file information
+    print(f"Checking files under : {root_directory}")
     df = create_file_dataframe(root_directory)
 
     # Print the files with the same size
     print_files_with_same_size(df)
+
+# Create a DataFrame with the file information
+df = create_file_dataframe(root_directory)
+
+# Print the files with the same size
+print_files_with_same_size(df)
