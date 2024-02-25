@@ -9,6 +9,14 @@ from send2trash import send2trash
 
 
 def create_file_dataframe(root_dir: str) -> pd.DataFrame:
+    """Create a DataFrame with the file information in the root directory and its subdirectories
+
+    Args:
+        root_dir (str): Root directory
+
+    Returns:
+        pd.DataFrame: DataFrame with the file information
+    """
     data = []
 
     for foldername, subfolders, filenames in os.walk(root_dir):
@@ -25,6 +33,11 @@ def create_file_dataframe(root_dir: str) -> pd.DataFrame:
 
 
 def print_files_with_same_size(df: pd.DataFrame) -> None:
+    """Print the files with the same size
+
+    Args:
+        df (pd.DataFrame): DataFrame with the file information
+    """
     total_storage_in_duplicates: int = 0
     size_groups = df.groupby("Size").filter(lambda x: len(x) > 1)
     for group_num, (size, group) in enumerate(size_groups.groupby("Size")):
@@ -46,6 +59,11 @@ def print_files_with_same_size(df: pd.DataFrame) -> None:
 
 
 def prompt_to_delete_by_number(group: pd.DataFrame) -> None:
+    """Prompt the user to enter the number of the file to delete
+
+    Args:
+        group (pd.DataFrame): DataFrame with the file information
+    """
 
     # Return if the first 8 characters of the file name (without the directory) are not the same
     if len(set(group["Filename"].str[:8])) != 1:
@@ -73,6 +91,7 @@ def prompt_to_delete_by_number(group: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
+
     # Check if the user wants to delete files
     parser = argparse.ArgumentParser()
     parser.add_argument("--prompt", action="store_true", dest="prompt", default=False)
