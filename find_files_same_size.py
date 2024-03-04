@@ -125,9 +125,3 @@ if __name__ == "__main__":
 
     # Print the files with the same size
     print_files_with_same_size(df)
-
-# Create a DataFrame with the file information
-df = create_file_dataframe(root_directory)
-
-# Print the files with the same size
-print_files_with_same_size(df)
