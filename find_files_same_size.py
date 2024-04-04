@@ -1,8 +1,6 @@
 import argparse
-import optparse
 import os
-import sys
-from pathlib import Path
+import re
 
 import pandas as pd
 from send2trash import send2trash
@@ -34,7 +32,40 @@ def create_file_dataframe(root_dir: str) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def print_files_with_same_size(df: pd.DataFrame) -> None:
+def match_files_edited_version(df: pd.DataFrame) -> None:
+    """Print the files with the same size
+
+    Args:
+        df (pd.DataFrame): DataFrame with the file information
+    """
+
+    # Create groups of files having the same name except one is an edited version of the other
+    # An unedited/edited pair can be identified because the unedited file name is in the form "AAAA1111.MP4" and the
+    # corresponding edited file name is in the form "AAAAE1111.MOV" (note the 'E' in middle of the edited file name, and
+    # the extension is different)
+    df = df.copy().assign(filename_prefix=lambda x: x["Filename"].str[:4])
+    groups = df.groupby("filename_prefix").filter(lambda x: len(x) > 1)
+
+    for group_num, (prefix, group) in enumerate(groups.groupby("filename_prefix")):
+        # Process only groups with 4 capital letters as the prefix
+        if re.match(r"^[A-Z]{4}$", prefix) is None:
+            continue
+
+        print(f"{group_num + 1}: Files with prefix {prefix}:")
+        group = group.sort_values("Full Path")
+
+        for i, (_, row) in enumerate(group.iterrows()):
+            print(f"  {i + 1}: {row['Full Path']}, size {row['Size']/1024.0/1024.0:,.1f} MB")
+
+        if prompt_delete:
+            prompt_to_delete_by_number(group)
+
+        print("\n")
+
+    pass
+
+
+def match_files_with_same_size(df: pd.DataFrame) -> None:
     """Print the files with the same size
 
     Args:
@@ -52,7 +83,9 @@ def print_files_with_same_size(df: pd.DataFrame) -> None:
             print(f"  {i + 1}: {row['Full Path']}")
 
         if prompt_delete:
-            prompt_to_delete_by_number(group)
+            # Skip if the first 8 characters of the file name (without the directory) are not the same
+            if len(set(group["Filename"].str[:8])) > 1:
+                prompt_to_delete_by_number(group)
 
         total_storage_in_duplicates -= size
         print("\n")
@@ -66,10 +99,6 @@ def prompt_to_delete_by_number(group: pd.DataFrame) -> None:
     Args:
         group (pd.DataFrame): DataFrame with the file information
     """
-
-    # Return if the first 8 characters of the file name (without the directory) are not the same
-    if len(set(group["Filename"].str[:8])) != 1:
-        return
 
     # Ask the user to enter the number of the file to delete
     response = input("Enter the number of the file to delete, or anything else to keep all: ")
@@ -105,7 +134,10 @@ if __name__ == "__main__":
     # Command line should look like this for entering the root directory and the --prompt flag:
     # python find_files_same_size.py --prompt "C:\Users\username\Documents"
     parser = argparse.ArgumentParser(description="Find files of the same size.")
-    parser.add_argument("--prompt", action="store_true", help="Prompt before deleting files.")
+    parser.add_argument("--size", action="store_true", default=False, help="Pair by identical file size.")
+    parser.add_argument("--edited", action="store_true", help="Pair by one being an edited version of the other.")
+    parser.add_argument("--prompt", action="store_true", dest="prompt", help="Prompt to delete files.")
+    parser.add_argument("--no-prompt", action="store_false", dest="prompt", help="Do not prompt to delete files.")
     parser.add_argument(
         "directory",
         nargs="?",
@@ -113,15 +145,22 @@ if __name__ == "__main__":
         type=lambda x: is_valid_directory(parser, x),
         help="Directory to search.",
     )
+    parser.set_defaults(prompt=True)
 
     args = parser.parse_args()
 
     root_directory = args.directory
-    prompt_delete = args.prompt
+    prompt_delete: bool = args.prompt
+    match_size: bool = args.size
+    match_edited: bool = args.edited
 
     # Create a DataFrame with the file information
     print(f"Checking files under : {root_directory}")
     df = create_file_dataframe(root_directory)
 
-    # Print the files with the same size
-    print_files_with_same_size(df)
+    if match_size:
+        # Match files with the same size
+        match_files_with_same_size(df)
+    elif match_edited:
+        # Match files where one is the edited version of the other
+        match_files_edited_version(df)
